@@ -72,7 +72,7 @@
       ]
     ],
     "extra": {
-      "eas": {
+      "eas": "nocothanhs-organization" {
         "projectId": "e0cf8a9d-a205-45ce-98dd-d5d08d0d80b0"
       }
     }
