@@ -79,3 +79,18 @@
     }
   }
 }
+let projectId;
+if (process.env.APP === 'app1') {
+  projectId = 'e0cf8a9d-a205-45ce-98dd-d5d08d0d80b0';
+} else if (process.env.APP === 'app2') {
+  projectId = 'e0cf8a9d-a205-45ce-98dd-d5d08d0d80b0';
+}
+export default {
+  name: 'testapp',
+  slug: process.env.APP,
+  extra: {
+    eas:  {
+      projectId
+    }
+  }
+}
