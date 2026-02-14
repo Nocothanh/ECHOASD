@@ -1,17 +1,14 @@
 {
   "expo": {
     "name": "Echo AI",
-    "slug": "echoai",
-    "owner": "nocothanhs-organization",
+    "slug": "echo-ai",
+    "owner": "nocothanh-organization",
     "version": "2.0.0",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#8b5cf6"
     },
@@ -24,14 +21,12 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Echo AI uses the microphone for voice input.",
-        "UIBackgroundModes": [
-          "audio"
-        ]
+        "UIBackgroundModes": ["audio"]
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./adaptive-icon.png",
         "backgroundColor": "#8b5cf6"
       },
       "package": "com.echo.ai",
@@ -53,20 +48,14 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            {
-              "scheme": "https",
-              "host": "echo.ai"
-            }
+            { "scheme": "https", "host": "echo.ai" }
           ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "category": ["BROWSABLE", "DEFAULT"]
         }
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png",
+      "favicon": "./favicon.png",
       "name": "Echo AI",
       "shortName": "Echo AI",
       "description": "Echo AI - Personalità Autentica",
@@ -78,7 +67,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#8b5cf6",
-          "image": "./assets/splash.png",
+          "image": "./splash.png",
           "resizeMode": "contain"
         }
       ]
@@ -90,6 +79,4 @@
     }
   }
 }
-
-
 
