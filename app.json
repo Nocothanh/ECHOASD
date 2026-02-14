@@ -1,9 +1,12 @@
 {
   "expo": {
     "name": "Echo AI",
-    "slug": "echoai",
-    "owner": "nocothanhs-organization",
+    "slug": "echo-ai",
+    "owner": "nocothanh-organization",
     "version": "2.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -87,3 +90,6 @@
     }
   }
 }
+
+
+
