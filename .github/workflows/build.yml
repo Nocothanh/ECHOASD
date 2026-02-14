@@ -27,12 +27,6 @@ jobs:
         run: npm install
 
       - name: Build APK
-        run: eas build --platform android --profile preview --non-interactive --no-wait=false
+        run: eas build --platform android --profile preview --non-interactive --wait
         env:
           EAS_BUILD_NO_EXPO_GO_WARNING: "true"
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: echo-ai-apk
-          path: "*.apk"
