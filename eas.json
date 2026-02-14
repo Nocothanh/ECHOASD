@@ -8,19 +8,21 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk",
-        "credentialsSource": "local",
-        "withoutCredentials": false
+        "credentialsSource": "local"
       }
     },
     "production": {
       "distribution": "internal",
       "android": {
         "buildType": "apk",
-        "credentialsSource": "local",
-        "withoutCredentials": false
+        "credentialsSource": "local"
       }
     }
   },
+  "submit": {
+    "preview": {},
+    "production": {}
+  }
   "submit": {
     "production": {}
   }
