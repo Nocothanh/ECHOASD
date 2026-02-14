@@ -27,6 +27,6 @@ jobs:
         run: npm install
 
       - name: Build APK
-        run: eas build --platform android --profile preview --non-interactive --wait
+        run: run: eas build --platform android --profile preview --non-interactive --wait
         env:
           EAS_BUILD_NO_EXPO_GO_WARNING: "true"
