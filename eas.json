@@ -18,8 +18,10 @@
         "credentialsSource": "local"
       }
     }
+  },
+  "submit": {
+    "production": {}
   }
 }
-
 
 
