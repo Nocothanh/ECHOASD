@@ -8,20 +8,14 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk",
-        "credentialsSource": "remote"
-      },
-      "env": {
-        "EAS_BUILD_NO_EXPO_GO_WARNING": "true"
+        "credentialsSource": "local"
       }
     },
     "production": {
       "distribution": "internal",
       "android": {
         "buildType": "apk",
-        "credentialsSource": "remote"
-      },
-      "env": {
-        "EAS_BUILD_NO_EXPO_GO_WARNING": "true"
+        "credentialsSource": "local"
       }
     }
   },
