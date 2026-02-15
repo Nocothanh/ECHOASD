@@ -747,9 +747,16 @@ function shiftMood(){echoMood=randomMood();setExpression(echoMood);}
 
 export default function App() {
   const webViewRef = useRef(null);
-  const [ready, setReady] = useState(false);
   const persistedDataRef = useRef({});
+  const webViewReadyRef = useRef(false);
+  const dataReadyRef = useRef(false);
 
+  // Hide splash immediately — show WebView right away
+  useEffect(() => {
+    SplashScreen.hideAsync();
+  }, []);
+
+  // Load persisted data in background
   useEffect(() => {
     (async () => {
       try {
@@ -760,21 +767,25 @@ export default function App() {
       } catch(e) {
         console.warn('Storage load error:', e);
       }
-      setReady(true);
+      dataReadyRef.current = true;
+      sendRestoreIfReady();
     })();
   }, []);
 
-  const onLoad = useCallback(async () => {
-    await SplashScreen.hideAsync();
-    // Send persisted data to WebView
-    setTimeout(() => {
+  function sendRestoreIfReady() {
+    if (dataReadyRef.current && webViewReadyRef.current) {
       try {
         webViewRef.current?.postMessage(JSON.stringify({
           type: 'restore',
           data: persistedDataRef.current,
         }));
       } catch(e) { console.warn('restore err:', e); }
-    }, 300);
+    }
+  }
+
+  const onLoad = useCallback(() => {
+    webViewReadyRef.current = true;
+    sendRestoreIfReady();
   }, []);
 
   const onMessage = useCallback(async (event) => {
@@ -796,16 +807,6 @@ export default function App() {
     const sub = BackHandler.addEventListener('hardwareBackPress', handler);
     return () => sub.remove();
   }, []);
-
-  if (!ready) {
-    return (
-      <View style={styles.loading}>
-        <Text style={styles.loadEmoji}>👤</Text>
-        <Text style={styles.loadName}>ECHO</Text>
-        <Text style={styles.loadMsg}>caricamento...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -837,11 +838,4 @@ export default function App() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0f' },
   webview: { flex: 1, backgroundColor: '#0a0a0f' },
-  loading: {
-    flex: 1, backgroundColor: '#0a0a0f',
-    alignItems: 'center', justifyContent: 'center', gap: 12,
-  },
-  loadEmoji: { fontSize: 64 },
-  loadName: { color: '#fff', fontSize: 28, fontWeight: '700', letterSpacing: 6, marginTop: 8 },
-  loadMsg: { color: '#6b7280', fontSize: 13, letterSpacing: 2 },
 });
