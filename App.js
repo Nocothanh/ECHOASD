@@ -2,8 +2,6 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { StyleSheet, View, StatusBar, Platform, BackHandler, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as SplashScreen from 'expo-splash-screen';
-import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 SplashScreen.preventAutoHideAsync();
@@ -750,67 +748,40 @@ function shiftMood(){echoMood=randomMood();setExpression(echoMood);}
 export default function App() {
   const webViewRef = useRef(null);
   const [ready, setReady] = useState(false);
-  const [loadMsg, setLoadMsg] = useState('caricamento...');
-  const vrmB64Ref = useRef('');
   const persistedDataRef = useRef({});
 
   useEffect(() => {
     (async () => {
       try {
-        setLoadMsg('caricamento dati...');
         const pairs = await AsyncStorage.multiGet(STORAGE_KEYS);
         const data = {};
         pairs.forEach(([k, v]) => { if (v !== null) data[k] = v; });
         persistedDataRef.current = data;
-
-        setLoadMsg('caricamento avatar...');
-        try {
-          const asset = Asset.fromModule(require('./assets/echo_avatar.vrm'));
-          await asset.downloadAsync();
-          vrmB64Ref.current = await FileSystem.readAsStringAsync(asset.localUri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-        } catch (vrmErr) {
-          console.warn('VRM load error (non-fatal):', vrmErr);
-          vrmB64Ref.current = '';
-        }
-
-        setReady(true);
-      } catch (e) {
-        console.warn('Init error:', e);
-        setReady(true);
+      } catch(e) {
+        console.warn('Storage load error:', e);
       }
+      setReady(true);
     })();
   }, []);
 
   const onLoad = useCallback(async () => {
     await SplashScreen.hideAsync();
+    // Send persisted data to WebView
     setTimeout(() => {
-      if (!webViewRef.current) return;
       try {
-        webViewRef.current.postMessage(JSON.stringify({
+        webViewRef.current?.postMessage(JSON.stringify({
           type: 'restore',
           data: persistedDataRef.current,
         }));
       } catch(e) { console.warn('restore err:', e); }
-      if (vrmB64Ref.current) {
-        setTimeout(() => {
-          try {
-            webViewRef.current?.postMessage(JSON.stringify({
-              type: 'vrm',
-              data: vrmB64Ref.current,
-            }));
-          } catch(e) { console.warn('vrm err:', e); }
-        }, 500);
-      }
     }, 300);
   }, []);
 
   const onMessage = useCallback(async (event) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
-      if (msg.type === 'store' && msg.key && msg.value !== undefined) {
-        await AsyncStorage.setItem(msg.key, msg.value);
+      if (msg.type === 'store' && msg.key) {
+        await AsyncStorage.setItem(msg.key, String(msg.value));
         persistedDataRef.current[msg.key] = msg.value;
       }
     } catch(e) { console.warn('onMessage err:', e); }
@@ -831,7 +802,7 @@ export default function App() {
       <View style={styles.loading}>
         <Text style={styles.loadEmoji}>👤</Text>
         <Text style={styles.loadName}>ECHO</Text>
-        <Text style={styles.loadMsg}>{loadMsg}</Text>
+        <Text style={styles.loadMsg}>caricamento...</Text>
       </View>
     );
   }
