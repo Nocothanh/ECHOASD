@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
-import { StyleSheet, View, StatusBar, Platform, BackHandler, Text } from 'react-native';
+import { useEffect, useRef, useCallback } from 'react';
+import { StyleSheet, View, StatusBar, Platform, BackHandler } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -85,10 +85,7 @@ const ECHO_HTML = `<!DOCTYPE html>
     #cambtn.active{background:#ec4899;color:#fff}
     #sbtn{background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff}
 
-    #avatar-container{width:100%;height:240px;background:linear-gradient(180deg,#0a0a0f 0%,#1a0a2e 60%,#0f0f1a 100%);position:relative;overflow:hidden;flex-shrink:0}
-    #avatar-canvas{width:100%;height:100%;display:block}
-    #avatar-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#8b5cf6;font-size:13px;letter-spacing:2px}
-    #mood-badge{position:absolute;top:8px;right:8px;background:rgba(139,92,246,.3);border:1px solid #8b5cf6;border-radius:12px;padding:3px 10px;color:#a78bfa;font-size:11px;letter-spacing:1px}
+
     #root{height:calc(100vh - 240px)}
     #sbtn:disabled{opacity:.3}
     #settings{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;align-items:flex-end;justify-content:center}
@@ -118,10 +115,7 @@ const ECHO_HTML = `<!DOCTYPE html>
     .nb-msg{color:rgba(255,255,255,.85);font-size:12px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   </style>
 
-  <!-- Three.js + VRM -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@1/lib/three-vrm.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
 </head>
 <body>
 <div id="splash"><div class="splash-av">👤</div><div class="splash-name">ECHO</div><div class="splash-sub">sempre sincera, mai gentile</div></div>
@@ -129,12 +123,6 @@ const ECHO_HTML = `<!DOCTYPE html>
 <div id="notif-banner" onclick="dismissNotif()">
   <div class="nb-av">👤</div>
   <div class="nb-txt"><div class="nb-name">Echo</div><div class="nb-msg" id="nb-msg"></div></div>
-</div>
-
-<div id="avatar-container">
-  <canvas id="avatar-canvas"></canvas>
-  <div id="avatar-loading">caricamento...</div>
-  <div id="mood-badge" id="mood-badge">😶 neutrale</div>
 </div>
 
 <div id="root">
@@ -586,156 +574,12 @@ window.addEventListener('load',()=>{
   setTimeout(()=>{
     if(!window._cfgLoaded){loadCfg();}
   },800);
-  initVRM();
   setTimeout(()=>{
     document.getElementById('splash').classList.add('hide');
     setTimeout(()=>document.getElementById('splash').style.display='none',500);
   },1200);
   scheduleEchoInit();
 });
-
-// ─── VRM Avatar ───────────────────────────────────────────────────────────────
-let vrmModel=null,vrmScene=null,vrmCamera=null,vrmRenderer=null,vrmClock=null;
-let lipSyncVal=0,blinkTimer=0,headTargetX=0,headTargetY=0;
-let isSpeaking=false;
-
-function initVRM(){
-  const canvas=document.getElementById('avatar-canvas');
-  const container=document.getElementById('avatar-container');
-  const W=container.clientWidth,H=container.clientHeight;
-
-  // Renderer
-  vrmRenderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true});
-  vrmRenderer.setSize(W,H);
-  vrmRenderer.setPixelRatio(window.devicePixelRatio);
-  vrmRenderer.outputEncoding=THREE.sRGBEncoding;
-
-  // Scene
-  vrmScene=new THREE.Scene();
-  vrmClock=new THREE.Clock();
-
-  // Camera
-  vrmCamera=new THREE.PerspectiveCamera(30,W/H,0.1,20);
-  vrmCamera.position.set(0,1.3,2.2);
-  vrmCamera.lookAt(0,1.3,0);
-
-  // Lighting
-  const ambLight=new THREE.AmbientLight(0xffffff,0.6);
-  vrmScene.add(ambLight);
-  const dirLight=new THREE.DirectionalLight(0xa78bfa,1.2);
-  dirLight.position.set(1,2,2);
-  vrmScene.add(dirLight);
-  const fillLight=new THREE.DirectionalLight(0xec4899,0.4);
-  fillLight.position.set(-2,1,-1);
-  vrmScene.add(fillLight);
-
-  // VRM loaded via postMessage from React Native
-  document.getElementById('avatar-loading').textContent='in attesa modello...';
-}
-
-function loadVRMFromB64(b64){
-  if(!b64||b64.length<100){
-    document.getElementById('avatar-loading').textContent='modello non trovato';
-    return;
-  }
-  document.getElementById('avatar-loading').textContent='caricamento...';
-  try{
-    const bin=atob(b64);
-    const buf=new ArrayBuffer(bin.length);
-    const arr=new Uint8Array(buf);
-    for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
-    const loader=new THREE.GLTFLoader();
-    loader.register(parser=>new THREE.VRM.VRMLoaderPlugin(parser));
-    loader.parse(buf,'',
-      gltf=>{
-        const vrm=gltf.userData.vrm;
-        if(!vrm){document.getElementById('avatar-loading').textContent='errore modello';return;}
-        if(THREE.VRMUtils&&THREE.VRMUtils.removeUnnecessaryJoints) THREE.VRMUtils.removeUnnecessaryJoints(gltf.scene);
-        vrmModel=vrm;
-        vrmScene.add(vrm.scene);
-        vrm.scene.rotation.y=Math.PI;
-        document.getElementById('avatar-loading').style.display='none';
-        animateVRM();
-      },
-      err=>{document.getElementById('avatar-loading').textContent='errore: '+err.message;}
-    );
-  }catch(e){document.getElementById('avatar-loading').textContent='errore decode';}
-
-  // Touch to move head
-  canvas.addEventListener('touchmove',e=>{
-    const r=canvas.getBoundingClientRect();
-    const x=((e.touches[0].clientX-r.left)/r.width-0.5)*0.8;
-    const y=-((e.touches[0].clientY-r.top)/r.height-0.5)*0.5;
-    headTargetX=x;headTargetY=y;
-  },{passive:true});
-}
-
-function animateVRM(){
-  requestAnimationFrame(animateVRM);
-  if(!vrmModel) return;
-  const dt=vrmClock.getDelta();
-  
-  // Lip sync
-  if(isSpeaking){
-    lipSyncVal=0.3+Math.sin(Date.now()*0.02)*0.3;
-  }else{
-    lipSyncVal*=0.85;
-  }
-  try{
-    vrmModel.expressionManager?.setValue('aa',Math.max(0,lipSyncVal));
-  }catch(e){}
-
-  // Blink
-  blinkTimer+=dt;
-  if(blinkTimer>3+Math.random()*3){
-    blinkTimer=0;
-    doBlink();
-  }
-
-  // Head sway (idle breathing)
-  const t=Date.now()*0.001;
-  const neck=vrmModel.humanoid?.getNormalizedBoneNode('neck');
-  if(neck){
-    neck.rotation.x+=(headTargetY+Math.sin(t*0.5)*0.03-neck.rotation.x)*0.05;
-    neck.rotation.y+=(headTargetX+Math.sin(t*0.3)*0.02-neck.rotation.y)*0.05;
-  }
-  const spine=vrmModel.humanoid?.getNormalizedBoneNode('spine');
-  if(spine){
-    spine.rotation.z=Math.sin(t*0.4)*0.015;
-  }
-
-  vrmModel.update(dt);
-  vrmRenderer.render(vrmScene,vrmCamera);
-}
-
-function doBlink(){
-  try{
-    const em=vrmModel?.expressionManager;
-    if(!em) return;
-    em.setValue('blink',1);
-    setTimeout(()=>em.setValue('blink',0),120);
-  }catch(e){}
-}
-
-function setExpression(mood){
-  if(!vrmModel?.expressionManager) return;
-  const em=vrmModel.expressionManager;
-  // Reset all
-  ['happy','angry','sad','surprised','relaxed'].forEach(e=>{try{em.setValue(e,0)}catch(_){}});
-  const moodBadge=document.getElementById('mood-badge');
-  if(mood==='playful'){
-    try{em.setValue('happy',0.8)}catch(e){}
-    if(moodBadge){moodBadge.textContent='😊 di buon umore';}
-  }else if(mood==='annoyed'){
-    try{em.setValue('angry',0.6)}catch(e){}
-    if(moodBadge){moodBadge.textContent='😒 irritata';}
-  }else if(mood==='cold'){
-    try{em.setValue('sad',0.4)}catch(e){}
-    if(moodBadge){moodBadge.textContent='🥶 fredda';}
-  }else{
-    if(moodBadge){moodBadge.textContent='😶 neutrale';}
-  }
-}
 
 function setLipSync(on){isSpeaking=on;}
 
@@ -751,41 +595,34 @@ export default function App() {
   const webViewReadyRef = useRef(false);
   const dataReadyRef = useRef(false);
 
-  // Hide splash immediately — show WebView right away
   useEffect(() => {
     SplashScreen.hideAsync();
-  }, []);
-
-  // Load persisted data in background
-  useEffect(() => {
     (async () => {
       try {
         const pairs = await AsyncStorage.multiGet(STORAGE_KEYS);
         const data = {};
         pairs.forEach(([k, v]) => { if (v !== null) data[k] = v; });
         persistedDataRef.current = data;
-      } catch(e) {
-        console.warn('Storage load error:', e);
-      }
+      } catch(e) {}
       dataReadyRef.current = true;
-      sendRestoreIfReady();
+      sendRestore();
     })();
   }, []);
 
-  function sendRestoreIfReady() {
+  function sendRestore() {
     if (dataReadyRef.current && webViewReadyRef.current) {
       try {
         webViewRef.current?.postMessage(JSON.stringify({
           type: 'restore',
           data: persistedDataRef.current,
         }));
-      } catch(e) { console.warn('restore err:', e); }
+      } catch(e) {}
     }
   }
 
   const onLoad = useCallback(() => {
     webViewReadyRef.current = true;
-    sendRestoreIfReady();
+    sendRestore();
   }, []);
 
   const onMessage = useCallback(async (event) => {
@@ -793,9 +630,8 @@ export default function App() {
       const msg = JSON.parse(event.nativeEvent.data);
       if (msg.type === 'store' && msg.key) {
         await AsyncStorage.setItem(msg.key, String(msg.value));
-        persistedDataRef.current[msg.key] = msg.value;
       }
-    } catch(e) { console.warn('onMessage err:', e); }
+    } catch(e) {}
   }, []);
 
   useEffect(() => {
