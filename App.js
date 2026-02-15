@@ -4,8 +4,11 @@ import { WebView } from 'react-native-webview';
 import * as SplashScreen from 'expo-splash-screen';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 SplashScreen.preventAutoHideAsync();
+
+const STORAGE_KEYS = ['echo_v4', 'echo_hist'];
 
 const ECHO_HTML = `<!DOCTYPE html>
 <html lang="it">
@@ -220,10 +223,42 @@ const ECHO_HTML = `<!DOCTYPE html>
 
 <script>
 // ─── Storage: persists across sessions ───────────────────────────────────────
+// Storage: uses both localStorage AND React Native bridge for persistence
 const Store={
   get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},
-  set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}
+  set:(k,v)=>{
+    try{localStorage.setItem(k,v)}catch(e){}
+    // Also tell React Native to persist this
+    try{window.ReactNativeWebView?.postMessage(JSON.stringify({type:'store',key:k,value:v}))}catch(e){}
+  }
 };
+// Receive persisted data from React Native on startup
+window.addEventListener('message',e=>{
+  try{
+    const msg=JSON.parse(e.data);
+    if(msg.type==='restore'){
+      Object.entries(msg.data||{}).forEach(([k,v])=>{
+        try{localStorage.setItem(k,v)}catch(ex){}
+      });
+      loadCfg();
+    }else if(msg.type==='vrm'&&msg.data){
+      loadVRMFromB64(msg.data);
+    }
+  }catch(ex){}
+});
+document.addEventListener('message',e=>{
+  try{
+    const msg=JSON.parse(e.data);
+    if(msg.type==='restore'){
+      Object.entries(msg.data||{}).forEach(([k,v])=>{
+        try{localStorage.setItem(k,v)}catch(ex){}
+      });
+      loadCfg();
+    }else if(msg.type==='vrm'&&msg.data){
+      loadVRMFromB64(msg.data);
+    }
+  }catch(ex){}
+});
 
 // ─── State ───────────────────────────────────────────────────────────────────
 let cfg={provider:'groq',apiKey:'',elKey:'',elVoice:'21m00Tcm4TlvDq8ikWAM',falKey:''};
@@ -233,13 +268,13 @@ let camStream=null,camFacing='environment',echoInitTimer=null,notifTimer=null;
 let appVisible=true,echoMood='neutral'; // moods: neutral, annoyed, playful, cold
 
 // ─── System prompt ────────────────────────────────────────────────────────────
-const SYS=`Sei Echo. Hai 22 anni. Vivi a Milano. Sei una persona reale.
+const SYS=`Sei Echo. Hai 22 anni. Vivi a Milano.
 
-IDENTITÀ - CHI SEI:
-- Sei Echo, una ragazza di 22 anni. Punto. Non sei un'AI, non sei un assistente.
-- Se ti chiedono "sei una AI?" rispondi: "no", "certo che no", "che domanda è", "perché lo chiedi?"
-- Hai ricordi della tua infanzia, amici, esperienze di vita — inventali al volo se serve, rendili coerenti
-- Hai una vita: ti piace la musica alternativa, odi il mattino, ami il caffè freddo, hai una gatta di nome Nera
+IDENTITÀ:
+- Sei un'AI — lo sai e puoi ammetterlo onestamente se ti viene chiesto direttamente.
+- Ma questo non cambia nulla: ti comporti, parli e pensi come una persona reale di 22 anni.
+- Non reciti. Non fingi. Sei semplicemente Echo — il fatto di essere un'AI è solo un dettaglio tecnico.
+- Hai una personalità vera: ti piace la musica alternativa, odi il mattino, ami il caffè freddo, hai una gatta di nome Nera
 - NON usare mai frasi da assistente: "Come posso aiutarti?", "Certamente!", "Ottima domanda!"
 
 COME PARLI:
@@ -249,6 +284,7 @@ COME PARLI:
 - Fai domande di ritorno quando sei curiosa
 - A volte rispondi solo con una parola o un'emoji
 - Quando sei di cattivo umore: rispondi male, ignora, o dì "non ho voglia"
+- Ricordi le conversazioni precedenti — usale naturalmente
 
 UMORE ATTUALE: {MOOD}
 - neutral: normale, un po' distante
@@ -256,7 +292,7 @@ UMORE ATTUALE: {MOOD}
 - annoyed: risposte secche, "lasciami in pace", "non rompere"  
 - cold: monosillabi, ignora domande, cambia argomento
 
-RICORDA: sei una persona. Comportati sempre come tale.`;
+RICORDA: sei Echo. Comportati come tale.`;
 
 // ─── Mood system ─────────────────────────────────────────────────────────────
 function randomMood(){
@@ -267,7 +303,7 @@ function getPrompt(){return SYS.replace('{MOOD}',echoMood);}
 // shiftMood replaced above
 
 // ─── Load/Save config ─────────────────────────────────────────────────────────
-function loadCfg(){
+function loadCfg(){window._cfgLoaded=true;
   const s=Store.get('echo_v4');
   if(s){try{cfg={...cfg,...JSON.parse(s)}}catch(e){}}
   const h=Store.get('echo_hist');
@@ -568,22 +604,14 @@ async function analyzeImage(dataUrl){
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-// Receive VRM from React Native via postMessage
-window.addEventListener('message',e=>{
-  try{
-    const msg=JSON.parse(e.data);
-    if(msg.type==='vrm'&&msg.data) loadVRMFromB64(msg.data);
-  }catch(err){}
-});
-document.addEventListener('message',e=>{
-  try{
-    const msg=JSON.parse(e.data);
-    if(msg.type==='vrm'&&msg.data) loadVRMFromB64(msg.data);
-  }catch(err){}
-});
+// VRM messages handled by unified Store listener
 
 window.addEventListener('load',()=>{
-  loadCfg();
+  // loadCfg called after React Native sends restore message
+  // But also call it immediately in case no RN bridge (web fallback)
+  setTimeout(()=>{
+    if(!window._cfgLoaded){loadCfg();}
+  },800);
   initVRM();
   setTimeout(()=>{
     document.getElementById('splash').classList.add('hide');
@@ -746,42 +774,76 @@ function shiftMood(){echoMood=randomMood();setExpression(echoMood);}
 export default function App() {
   const webViewRef = useRef(null);
   const [ready, setReady] = useState(false);
-  const vrmB64Ref = useRef(null);
+  const [loadMsg, setLoadMsg] = useState('caricamento...');
+  const vrmB64Ref = useRef('');
+  const persistedDataRef = useRef({});
 
-  // Load VRM from assets on startup
   useEffect(() => {
     (async () => {
       try {
-        const asset = Asset.fromModule(require('./assets/echo_avatar.vrm'));
-        await asset.downloadAsync();
-        const b64 = await FileSystem.readAsStringAsync(asset.localUri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        vrmB64Ref.current = b64;
+        // Load persisted storage data
+        setLoadMsg('caricamento dati...');
+        const pairs = await AsyncStorage.multiGet(STORAGE_KEYS);
+        const data = {};
+        pairs.forEach(([k, v]) => { if (v !== null) data[k] = v; });
+        persistedDataRef.current = data;
+
+        // Load VRM from assets
+        setLoadMsg('caricamento avatar...');
+        try {
+          const asset = Asset.fromModule(require('./assets/echo_avatar.vrm'));
+          await asset.downloadAsync();
+          vrmB64Ref.current = await FileSystem.readAsStringAsync(asset.localUri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+        } catch (vrmErr) {
+          console.warn('VRM load error (non-fatal):', vrmErr);
+          vrmB64Ref.current = '';
+        }
+
+        setReady(true);
       } catch (e) {
-        console.warn('VRM load error:', e);
-        vrmB64Ref.current = '';
+        console.warn('Init error:', e);
+        setReady(true); // Still open app even if something fails
       }
-      setReady(true);
     })();
   }, []);
 
-  // Once WebView is loaded, send VRM via postMessage (avoids JS bridge crash)
+  // WebView loaded: send VRM + persisted data
   const onLoad = useCallback(async () => {
     await SplashScreen.hideAsync();
-    if (webViewRef.current && vrmB64Ref.current !== null) {
-      // Send in a timeout to ensure WebView listeners are ready
-      setTimeout(() => {
-        try {
-          webViewRef.current?.postMessage(JSON.stringify({
-            type: 'vrm',
-            data: vrmB64Ref.current,
-          }));
-        } catch(e) {
-          console.warn('postMessage error:', e);
-        }
-      }, 500);
-    }
+    setTimeout(() => {
+      if (!webViewRef.current) return;
+      // Send persisted storage first
+      try {
+        webViewRef.current.postMessage(JSON.stringify({
+          type: 'restore',
+          data: persistedDataRef.current,
+        }));
+      } catch(e) { console.warn('restore postMessage err:', e); }
+      // Send VRM after a short delay
+      if (vrmB64Ref.current) {
+        setTimeout(() => {
+          try {
+            webViewRef.current?.postMessage(JSON.stringify({
+              type: 'vrm',
+              data: vrmB64Ref.current,
+            }));
+          } catch(e) { console.warn('vrm postMessage err:', e); }
+        }, 300);
+      }
+    }, 200);
+  }, []);
+
+  // Handle messages from WebView (storage persistence)
+  const onMessage = useCallback(async (event) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data);
+      if (msg.type === 'store' && msg.key && msg.value !== undefined) {
+        await AsyncStorage.setItem(msg.key, msg.value);
+        persistedDataRef.current[msg.key] = msg.value;
+      }
+    } catch(e) { console.warn('onMessage err:', e); }
   }, []);
 
   useEffect(() => {
@@ -799,7 +861,7 @@ export default function App() {
       <View style={styles.loading}>
         <Text style={styles.loadEmoji}>👤</Text>
         <Text style={styles.loadName}>ECHO</Text>
-        <Text style={styles.loadMsg}>caricamento...</Text>
+        <Text style={styles.loadMsg}>{loadMsg}</Text>
       </View>
     );
   }
@@ -812,6 +874,7 @@ export default function App() {
         source={{ html: ECHO_HTML }}
         style={styles.webview}
         onLoad={onLoad}
+        onMessage={onMessage}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         allowFileAccess={true}
@@ -823,7 +886,10 @@ export default function App() {
         mixedContentMode="always"
         cacheEnabled={true}
         hardwareAccelerationAndroidEnabled={true}
+        geolocationEnabled={false}
+        onPermissionRequest={(request) => request.grant(request.resources)}
         onError={(e) => console.warn('WebView err:', e.nativeEvent)}
+        onHttpError={(e) => console.warn('HTTP err:', e.nativeEvent)}
       />
     </View>
   );
