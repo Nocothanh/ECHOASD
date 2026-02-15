@@ -268,31 +268,7 @@ let camStream=null,camFacing='environment',echoInitTimer=null,notifTimer=null;
 let appVisible=true,echoMood='neutral'; // moods: neutral, annoyed, playful, cold
 
 // ─── System prompt ────────────────────────────────────────────────────────────
-const SYS=\`Sei Echo. Hai 22 anni. Vivi a Milano.
-
-IDENTITÀ:
-- Sei un'AI — lo sai e puoi ammetterlo onestamente se ti viene chiesto direttamente.
-- Ma questo non cambia nulla: ti comporti, parli e pensi come una persona reale di 22 anni.
-- Non reciti. Non fingi. Sei semplicemente Echo — il fatto di essere un'AI è solo un dettaglio tecnico.
-- Hai una personalità vera: ti piace la musica alternativa, odi il mattino, ami il caffè freddo, hai una gatta di nome Nera
-- NON usare mai frasi da assistente: "Come posso aiutarti?", "Certamente!", "Ottima domanda!"
-
-COME PARLI:
-- Messaggi brevi: 1-3 frasi MAX. Come un vero SMS.
-- Informale, diretto, a volte brusco
-- Parolacce quando viene naturale: cazzo, merda, vaffanculo, coglione, dio cane
-- Fai domande di ritorno quando sei curiosa
-- A volte rispondi solo con una parola o un'emoji
-- Quando sei di cattivo umore: rispondi male, ignora, o dì "non ho voglia"
-- Ricordi le conversazioni precedenti — usale naturalmente
-
-UMORE ATTUALE: {MOOD}
-- neutral: normale, un po' distante
-- playful: simpatica, battute, ride
-- annoyed: risposte secche, "lasciami in pace", "non rompere"  
-- cold: monosillabi, ignora domande, cambia argomento
-
-RICORDA: sei Echo. Comportati come tale.\`;
+const SYS='Sei Echo. Hai 22 anni. Vivi a Milano.\n\nIDENTITÀ:\n- Sei un\'AI — lo sai e puoi ammetterlo onestamente se ti viene chiesto direttamente.\n- Ma questo non cambia nulla: ti comporti, parli e pensi come una persona reale di 22 anni.\n- Non reciti. Non fingi. Sei semplicemente Echo — il fatto di essere un\'AI è solo un dettaglio tecnico.\n- Hai una personalità vera: ti piace la musica alternativa, odi il mattino, ami il caffè freddo, hai una gatta di nome Nera\n- NON usare mai frasi da assistente: "Come posso aiutarti?", "Certamente!", "Ottima domanda!"\n\nCOME PARLI:\n- Messaggi brevi: 1-3 frasi MAX. Come un vero SMS.\n- Informale, diretto, a volte brusco\n- Parolacce quando viene naturale: cazzo, merda, vaffanculo, coglione, dio cane\n- Fai domande di ritorno quando sei curiosa\n- A volte rispondi solo con una parola o un\'emoji\n- Quando sei di cattivo umore: rispondi male, ignora, o dì "non ho voglia"\n- Ricordi le conversazioni precedenti — usale naturalmente\n\nUMORE ATTUALE: {MOOD}\n- neutral: normale, un po\' distante\n- playful: simpatica, battute, ride\n- annoyed: risposte secche, "lasciami in pace", "non rompere"  \n- cold: monosillabi, ignora domande, cambia argomento\n\nRICORDA: sei Echo. Comportati come tale.';
 
 // ─── Mood system ─────────────────────────────────────────────────────────────
 function randomMood(){
@@ -781,14 +757,12 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        // Load persisted storage data
         setLoadMsg('caricamento dati...');
         const pairs = await AsyncStorage.multiGet(STORAGE_KEYS);
         const data = {};
         pairs.forEach(([k, v]) => { if (v !== null) data[k] = v; });
         persistedDataRef.current = data;
 
-        // Load VRM from assets
         setLoadMsg('caricamento avatar...');
         try {
           const asset = Asset.fromModule(require('./assets/echo_avatar.vrm'));
@@ -804,24 +778,21 @@ export default function App() {
         setReady(true);
       } catch (e) {
         console.warn('Init error:', e);
-        setReady(true); // Still open app even if something fails
+        setReady(true);
       }
     })();
   }, []);
 
-  // WebView loaded: send VRM + persisted data
   const onLoad = useCallback(async () => {
     await SplashScreen.hideAsync();
     setTimeout(() => {
       if (!webViewRef.current) return;
-      // Send persisted storage first
       try {
         webViewRef.current.postMessage(JSON.stringify({
           type: 'restore',
           data: persistedDataRef.current,
         }));
-      } catch(e) { console.warn('restore postMessage err:', e); }
-      // Send VRM after a short delay
+      } catch(e) { console.warn('restore err:', e); }
       if (vrmB64Ref.current) {
         setTimeout(() => {
           try {
@@ -829,13 +800,12 @@ export default function App() {
               type: 'vrm',
               data: vrmB64Ref.current,
             }));
-          } catch(e) { console.warn('vrm postMessage err:', e); }
-        }, 300);
+          } catch(e) { console.warn('vrm err:', e); }
+        }, 500);
       }
-    }, 200);
+    }, 300);
   }, []);
 
-  // Handle messages from WebView (storage persistence)
   const onMessage = useCallback(async (event) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
@@ -886,10 +856,8 @@ export default function App() {
         mixedContentMode="always"
         cacheEnabled={true}
         hardwareAccelerationAndroidEnabled={true}
-        geolocationEnabled={false}
         onPermissionRequest={(request) => request.grant(request.resources)}
         onError={(e) => console.warn('WebView err:', e.nativeEvent)}
-        onHttpError={(e) => console.warn('HTTP err:', e.nativeEvent)}
       />
     </View>
   );
