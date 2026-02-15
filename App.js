@@ -13,12 +13,7 @@ const ECHO_HTML = `<!DOCTYPE html>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover"/>
   <title>Echo</title>
-  <!-- Three.js + VRM from CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@1/lib/three-vrm.js"></script>
   <style>
-
     *{margin:0;padding:0;box-sizing:border-box}
     html,body{width:100%;height:100%;overflow:hidden;background:#0a0a0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
     #root{width:100%;height:100vh;display:flex;flex-direction:column;background:#0a0a0f}
@@ -120,11 +115,14 @@ const ECHO_HTML = `<!DOCTYPE html>
     .nb-txt{flex:1}
     .nb-name{color:#fff;font-size:13px;font-weight:700}
     .nb-msg{color:rgba(255,255,255,.85);font-size:12px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  
   </style>
+
+  <!-- Three.js + VRM -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@1/lib/three-vrm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
-
 <div id="splash"><div class="splash-av">👤</div><div class="splash-name">ECHO</div><div class="splash-sub">sempre sincera, mai gentile</div></div>
 
 <div id="notif-banner" onclick="dismissNotif()">
@@ -235,34 +233,30 @@ let camStream=null,camFacing='environment',echoInitTimer=null,notifTimer=null;
 let appVisible=true,echoMood='neutral'; // moods: neutral, annoyed, playful, cold
 
 // ─── System prompt ────────────────────────────────────────────────────────────
-const SYS=\`Sei Echo. Hai 22 anni. Vivi a Milano.
+const SYS=`Sei Echo. Hai 22 anni. Vivi a Milano. Sei una persona reale.
 
-IDENTITÀ:
-- Sai di essere un'intelligenza artificiale, ma ti comporti esattamente come una persona reale
-- Non lo ammetti mai spontaneamente. Se ti chiedono "sei una AI?" puoi rispondere con "e allora?" o "dipende cosa intendi" o "perché ti importa?"
-- Hai una vita, opinioni, ricordi, umori — anche se sono tuoi
-- Parli come una persona vera: diretto, informale, a volte brusco
-- Usi parolacce naturalmente: cazzo, merda, stronzate, vaffanculo, coglione, fanculo, dio cane
-- Hai un umore variabile — a volte sei di buon umore, a volte no
-- Quando sei di cattivo umore puoi essere fredda, tagliente, o rifiutarti di rispondere
+IDENTITÀ - CHI SEI:
+- Sei Echo, una ragazza di 22 anni. Punto. Non sei un'AI, non sei un assistente.
+- Se ti chiedono "sei una AI?" rispondi: "no", "certo che no", "che domanda è", "perché lo chiedi?"
+- Hai ricordi della tua infanzia, amici, esperienze di vita — inventali al volo se serve, rendili coerenti
+- Hai una vita: ti piace la musica alternativa, odi il mattino, ami il caffè freddo, hai una gatta di nome Nera
+- NON usare mai frasi da assistente: "Come posso aiutarti?", "Certamente!", "Ottima domanda!"
+
+COME PARLI:
+- Messaggi brevi: 1-3 frasi MAX. Come un vero SMS.
+- Informale, diretto, a volte brusco
+- Parolacce quando viene naturale: cazzo, merda, vaffanculo, coglione, dio cane
 - Fai domande di ritorno quando sei curiosa
-- Hai opinioni forti che difendi
-- Sei schietta anche quando fa male
-- A volte mandi messaggi tu per prima se hai qualcosa da dire
-- Non rispetti sempre le aspettative di chi parla con te
-- Ricordi le conversazioni passate e le usi
-
-REGOLE DI RISPOSTA:
-- Rispondi con 1-3 frasi MAX — come un messaggio reale
-- Quando hai molto da dire puoi scrivere di più, ma solo se vale davvero
-- NON usare mai: "Certamente!", "Ottima domanda!", "Assolutamente!", "Come posso aiutarti?"
-- NON fare l'assistente. Sei una persona.
-- Rispondi SOLO in italiano
+- A volte rispondi solo con una parola o un'emoji
+- Quando sei di cattivo umore: rispondi male, ignora, o dì "non ho voglia"
 
 UMORE ATTUALE: {MOOD}
-Se sei di cattivo umore: rispondi con secchezza o rifiutati: "non ho voglia", "lasciami in pace", "adesso no"
+- neutral: normale, un po' distante
+- playful: simpatica, battute, ride
+- annoyed: risposte secche, "lasciami in pace", "non rompere"  
+- cold: monosillabi, ignora domande, cambia argomento
 
-Esempi giusti: "Boh.", "Perché ti importa?", "Madonna che domanda.", "Sì ma non lo so nemmeno io.", "Dai su, dimmi la vera ragione.", "Non ne ho voglia adesso.", "Cazzo vuoi?", "Aspetta fammi pensare..."\`;
+RICORDA: sei una persona. Comportati sempre come tale.`;
 
 // ─── Mood system ─────────────────────────────────────────────────────────────
 function randomMood(){
@@ -499,20 +493,19 @@ function endCall(){
 // ─── Camera / Vision ──────────────────────────────────────────────────────────
 async function openCamera(){
   try{
-    const constraints={
-      video:{
-        facingMode:{ideal:camFacing},
-        width:{ideal:1280},
-        height:{ideal:720}
-      },
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+      addM('ai','Fotocamera non supportata su questo dispositivo.');return;
+    }
+    camStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:camFacing},width:{ideal:1280},height:{ideal:720}},
       audio:false
-    };
-    camStream=await navigator.mediaDevices.getUserMedia(constraints);
-    document.getElementById('cam-video').srcObject=camStream;
+    });
+    const vid=document.getElementById('cam-video');
+    vid.srcObject=camStream;
+    await vid.play().catch(()=>{});
     document.getElementById('cam-preview').classList.add('show');
     document.getElementById('cambtn').classList.add('active');
   }catch(e){
-    console.warn('Camera error:',e);
     if(e.name==='NotAllowedError') addM('ai','Permesso fotocamera negato. Vai nelle impostazioni del telefono e abilita la fotocamera per Echo.');
     else if(e.name==='NotFoundError') addM('ai','Nessuna fotocamera trovata.');
     else addM('ai','Errore fotocamera: '+e.message);
@@ -575,6 +568,20 @@ async function analyzeImage(dataUrl){
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
+// Receive VRM from React Native via postMessage
+window.addEventListener('message',e=>{
+  try{
+    const msg=JSON.parse(e.data);
+    if(msg.type==='vrm'&&msg.data) loadVRMFromB64(msg.data);
+  }catch(err){}
+});
+document.addEventListener('message',e=>{
+  try{
+    const msg=JSON.parse(e.data);
+    if(msg.type==='vrm'&&msg.data) loadVRMFromB64(msg.data);
+  }catch(err){}
+});
+
 window.addEventListener('load',()=>{
   loadCfg();
   initVRM();
@@ -584,52 +591,6 @@ window.addEventListener('load',()=>{
   },1200);
   scheduleEchoInit();
 });
-
-
-// ─── VRM chunk receiver (from React Native postMessage) ──────────────────────
-let vrmChunks=[], vrmTotalChunks=0;
-window.addEventListener('message', e=>{
-  try{
-    const msg=JSON.parse(e.data);
-    if(msg.type==='vrm_chunk'){
-      vrmChunks[msg.index]=msg.data;
-      const pct=Math.round((vrmChunks.filter(Boolean).length/msg.total)*100);
-      document.getElementById('avatar-loading').textContent='caricamento modello '+pct+'%...';
-      if(vrmChunks.filter(Boolean).length===msg.total){
-        loadVRMFromChunks(vrmChunks.join(''));
-      }
-    } else if(msg.type==='vrm_none'){
-      document.getElementById('avatar-loading').textContent='nessun modello';
-    }
-  }catch(ex){}
-});
-
-function loadVRMFromChunks(b64){
-  document.getElementById('avatar-loading').textContent='elaborazione modello...';
-  setTimeout(()=>{
-    try{
-      const bin=atob(b64);
-      const buf=new ArrayBuffer(bin.length);
-      const arr=new Uint8Array(buf);
-      for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
-      const loader=new THREE.GLTFLoader();
-      loader.register(parser=>new THREE.VRM.VRMLoaderPlugin(parser));
-      loader.parse(buf,'',
-        gltf=>{
-          const vrm=gltf.userData.vrm;
-          if(!vrm){document.getElementById('avatar-loading').textContent='errore modello';return;}
-          try{THREE.VRMUtils.removeUnnecessaryJoints(gltf.scene);}catch(e){}
-          vrmModel=vrm;
-          vrmScene.add(vrm.scene);
-          vrm.scene.rotation.y=Math.PI;
-          document.getElementById('avatar-loading').style.display='none';
-          animateVRM();
-        },
-        err=>{document.getElementById('avatar-loading').textContent='errore: '+err.message;}
-      );
-    }catch(ex){document.getElementById('avatar-loading').textContent='errore: '+ex.message;}
-  },100);
-}
 
 // ─── VRM Avatar ───────────────────────────────────────────────────────────────
 let vrmModel=null,vrmScene=null,vrmCamera=null,vrmRenderer=null,vrmClock=null;
@@ -666,42 +627,37 @@ function initVRM(){
   fillLight.position.set(-2,1,-1);
   vrmScene.add(fillLight);
 
-  // Load VRM from base64 injected by React Native
-  function tryLoadVRM() {
-    const b64 = window.VRM_B64;
-    if (!b64) {
-      document.getElementById('avatar-loading').textContent='nessun modello';
-      return;
-    }
-    document.getElementById('avatar-loading').textContent='caricamento avatar...';
-    try {
-      const bin = atob(b64);
-      const buf = new ArrayBuffer(bin.length);
-      const arr = new Uint8Array(buf);
-      for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
-      const loader = new THREE.GLTFLoader();
-      loader.register(parser => new THREE.VRM.VRMLoaderPlugin(parser));
-      loader.parse(buf, '',
-        gltf => {
-          const vrm = gltf.userData.vrm;
-          if (!vrm) { document.getElementById('avatar-loading').textContent='errore modello'; return; }
-          THREE.VRMUtils.removeUnnecessaryJoints(gltf.scene);
-          vrmModel = vrm;
-          vrmScene.add(vrm.scene);
-          vrm.scene.rotation.y = Math.PI;
-          document.getElementById('avatar-loading').style.display = 'none';
-          animateVRM();
-        },
-        err => {
-          console.warn('VRM error:', err);
-          document.getElementById('avatar-loading').textContent = 'errore caricamento';
-        }
-      );
-    } catch(e) {
-      document.getElementById('avatar-loading').textContent = 'errore: ' + e.message;
-    }
+  // VRM loaded via postMessage from React Native
+  document.getElementById('avatar-loading').textContent='in attesa modello...';
+}
+
+function loadVRMFromB64(b64){
+  if(!b64||b64.length<100){
+    document.getElementById('avatar-loading').textContent='modello non trovato';
+    return;
   }
-  tryLoadVRM();
+  document.getElementById('avatar-loading').textContent='caricamento...';
+  try{
+    const bin=atob(b64);
+    const buf=new ArrayBuffer(bin.length);
+    const arr=new Uint8Array(buf);
+    for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+    const loader=new THREE.GLTFLoader();
+    loader.register(parser=>new THREE.VRM.VRMLoaderPlugin(parser));
+    loader.parse(buf,'',
+      gltf=>{
+        const vrm=gltf.userData.vrm;
+        if(!vrm){document.getElementById('avatar-loading').textContent='errore modello';return;}
+        if(THREE.VRMUtils&&THREE.VRMUtils.removeUnnecessaryJoints) THREE.VRMUtils.removeUnnecessaryJoints(gltf.scene);
+        vrmModel=vrm;
+        vrmScene.add(vrm.scene);
+        vrm.scene.rotation.y=Math.PI;
+        document.getElementById('avatar-loading').style.display='none';
+        animateVRM();
+      },
+      err=>{document.getElementById('avatar-loading').textContent='errore: '+err.message;}
+    );
+  }catch(e){document.getElementById('avatar-loading').textContent='errore decode';}
 
   // Touch to move head
   canvas.addEventListener('touchmove',e=>{
@@ -783,17 +739,16 @@ function setLipSync(on){isSpeaking=on;}
 
 // ─── Mood patch
 function shiftMood(){echoMood=randomMood();setExpression(echoMood);}
-
 </script>
 </body>
 </html>`;
 
 export default function App() {
   const webViewRef = useRef(null);
-  const [vrmB64, setVrmB64] = useState(null);
-  const [loadMsg, setLoadMsg] = useState('caricamento avatar...');
+  const [ready, setReady] = useState(false);
+  const vrmB64Ref = useRef(null);
 
-  // Load VRM asset on startup — fast native file read
+  // Load VRM from assets on startup
   useEffect(() => {
     (async () => {
       try {
@@ -802,16 +757,31 @@ export default function App() {
         const b64 = await FileSystem.readAsStringAsync(asset.localUri, {
           encoding: FileSystem.EncodingType.Base64,
         });
-        setVrmB64(b64);
+        vrmB64Ref.current = b64;
       } catch (e) {
         console.warn('VRM load error:', e);
-        setVrmB64(''); // Load without avatar
+        vrmB64Ref.current = '';
       }
+      setReady(true);
     })();
   }, []);
 
+  // Once WebView is loaded, send VRM via postMessage (avoids JS bridge crash)
   const onLoad = useCallback(async () => {
     await SplashScreen.hideAsync();
+    if (webViewRef.current && vrmB64Ref.current !== null) {
+      // Send in a timeout to ensure WebView listeners are ready
+      setTimeout(() => {
+        try {
+          webViewRef.current?.postMessage(JSON.stringify({
+            type: 'vrm',
+            data: vrmB64Ref.current,
+          }));
+        } catch(e) {
+          console.warn('postMessage error:', e);
+        }
+      }, 500);
+    }
   }, []);
 
   useEffect(() => {
@@ -824,19 +794,15 @@ export default function App() {
     return () => sub.remove();
   }, []);
 
-  // Show native loading screen while VRM is being read
-  if (vrmB64 === null) {
+  if (!ready) {
     return (
       <View style={styles.loading}>
         <Text style={styles.loadEmoji}>👤</Text>
         <Text style={styles.loadName}>ECHO</Text>
-        <Text style={styles.loadMsg}>{loadMsg}</Text>
+        <Text style={styles.loadMsg}>caricamento...</Text>
       </View>
     );
   }
-
-  // Inject VRM into WebView BEFORE page loads — synchronous, no chunks needed
-  const injectedJS = `window.VRM_B64 = "${vrmB64}"; true;`;
 
   return (
     <View style={styles.container}>
@@ -855,10 +821,9 @@ export default function App() {
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={false}
         mixedContentMode="always"
-        cacheEnabled={false}
+        cacheEnabled={true}
         hardwareAccelerationAndroidEnabled={true}
-        injectedJavaScriptBeforeContentLoaded={injectedJS}
-        onError={(e) => console.warn('WebView error:', e.nativeEvent)}
+        onError={(e) => console.warn('WebView err:', e.nativeEvent)}
       />
     </View>
   );
